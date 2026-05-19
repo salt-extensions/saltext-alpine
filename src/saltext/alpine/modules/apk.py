@@ -104,7 +104,7 @@ def refresh_db(**kwargs):
 
     if errors:
         raise CommandExecutionError(
-            "Problem encountered installing package(s)",
+            "Problem encountered updating the package database",
             info={"errors": errors, "changes": ret},
         )
 
@@ -117,10 +117,9 @@ def _list_pkgs_from_context(versions_as_list):
     """
     if versions_as_list:
         return __context__["pkg.list_pkgs"]
-    else:
-        ret = copy.deepcopy(__context__["pkg.list_pkgs"])
-        __salt__["pkg_resource.stringify"](ret)
-        return ret
+    ret = copy.deepcopy(__context__["pkg.list_pkgs"])
+    __salt__["pkg_resource.stringify"](ret)
+    return ret
 
 
 def list_pkgs(versions_as_list=False, **kwargs):
@@ -138,9 +137,7 @@ def list_pkgs(versions_as_list=False, **kwargs):
     """
     versions_as_list = salt.utils.data.is_true(versions_as_list)
     # not yet implemented or not applicable
-    if any(
-        [salt.utils.data.is_true(kwargs.get(x)) for x in ("removed", "purge_desired")]
-    ):
+    if any(salt.utils.data.is_true(kwargs.get(x)) for x in ("removed", "purge_desired")):
         return {}
 
     if "pkg.list_pkgs" in __context__ and kwargs.get("use_context", True):
@@ -205,14 +202,12 @@ def latest_version(*names, **kwargs):
         except (ValueError, IndexError):
             pass
 
-    # If version is empty, package may not be installed
-    for pkg in ret:
-        if not ret[pkg]:
+    # If version is empty, the package may not be installed; search for it
+    for pkg, current_version in ret.items():
+        if not current_version:
             installed = pkgs.get(pkg)
             cmd = ["apk", "search", pkg]
-            out = __salt__["cmd.run_stdout"](
-                cmd, output_loglevel="trace", python_shell=False
-            )
+            out = __salt__["cmd.run_stdout"](cmd, output_loglevel="trace", python_shell=False)
             for line in salt.utils.itertools.split(out, "\n"):
                 try:
                     pkg_version = "-".join(line.split("-")[-2:])
@@ -266,19 +261,16 @@ def install(name=None, refresh=False, pkgs=None, sources=None, **kwargs):
             salt '*' pkg.install pkgs='["foo", "bar"]'
 
     sources
-        A list of IPK packages to install. Must be passed as a list of dicts,
+        A list of .apk packages to install. Must be passed as a list of dicts,
         with the keys being package names, and the values being the source URI
-        or local path to the package.  Dependencies are automatically resolved
+        or local path to the package. Dependencies are automatically resolved
         and marked as auto-installed.
 
         CLI Example:
 
         .. code-block:: bash
 
-            salt '*' pkg.install sources='[{"foo": "salt://foo.deb"},{"bar": "salt://bar.deb"}]'
-
-    install_recommends
-        Whether to install the packages marked as recommended. Default is True.
+            salt '*' pkg.install sources='[{"foo": "salt://foo.apk"},{"bar": "salt://bar.apk"}]'
 
     Returns a dict containing the new package names and versions::
 
@@ -297,8 +289,8 @@ def install(name=None, refresh=False, pkgs=None, sources=None, **kwargs):
             pkg_to_install = [name]
 
     if pkgs:
-        # We don't support installing specific version for now
-        # so transform the dict in list ignoring version provided
+        # Specific version installation is not yet supported, so extract
+        # just the package name from any dict entries in the list.
         pkgs = [next(iter(p)) for p in pkgs if isinstance(p, dict)]
         pkg_to_install.extend(pkgs)
 
@@ -310,7 +302,8 @@ def install(name=None, refresh=False, pkgs=None, sources=None, **kwargs):
 
     cmd = ["apk", "add"]
 
-    # Switch in update mode if a package is already installed
+    # Add the upgrade flag if any requested package is already installed,
+    # since apk will otherwise treat the install as a no-op for those packages.
     for _pkg in pkg_to_install:
         if old.get(_pkg):
             cmd.append("-u")
@@ -340,14 +333,28 @@ def install(name=None, refresh=False, pkgs=None, sources=None, **kwargs):
 
 def purge(name=None, pkgs=None, **kwargs):
     """
-    Alias to remove
+    Remove packages and their configuration files using ``apk del --purge``.
+
+    name
+        The name of the package to be purged.
+
+    pkgs
+        A list of packages to purge. Must be passed as a python list. The
+        ``name`` parameter will be ignored if this option is passed.
+
+    Returns a dict containing the changes.
+
+    CLI Example:
+
+    .. code-block:: bash
+
+        salt '*' pkg.purge <package name>
+        salt '*' pkg.purge pkgs='["foo", "bar"]'
     """
     return remove(name=name, pkgs=pkgs, purge=True)
 
 
-def remove(
-    name=None, pkgs=None, purge=False, **kwargs
-):  # pylint: disable=unused-argument
+def remove(name=None, pkgs=None, purge=False, **kwargs):  # pylint: disable=unused-argument
     """
     Remove packages using ``apk del``.
 
@@ -496,8 +503,7 @@ def list_upgrades(refresh=True, **kwargs):
         if "stdout" in call:
             comment += call["stdout"]
         raise CommandExecutionError(comment)
-    else:
-        out = call["stdout"]
+    out = call["stdout"]
 
     for line in out.splitlines():
         if "Upgrading" in line:
@@ -511,9 +517,9 @@ def list_upgrades(refresh=True, **kwargs):
 
 def file_list(*packages, **kwargs):
     """
-    List the files that belong to a package. Not specifying any packages will
-    return a list of _every_ file on the system's package database (not
-    generally recommended).
+    List the files that belong to a package as a flat list. Not specifying
+    any packages will return a list of every file on the system's package
+    database (not generally recommended).
 
     CLI Examples:
 
@@ -523,22 +529,28 @@ def file_list(*packages, **kwargs):
         salt '*' pkg.file_list httpd postfix
         salt '*' pkg.file_list
     """
-    return file_dict(*packages)
+    if not packages:
+        return "Package name should be provided"
+    result = file_dict(*packages)
+    files = []
+    for pkg_files in result.get("packages", {}).values():
+        files.extend(pkg_files)
+    return files
 
 
 def file_dict(*packages, **kwargs):
     """
     List the files that belong to a package, grouped by package. Not
-    specifying any packages will return a list of _every_ file on the system's
+    specifying any packages will return a list of every file on the system's
     package database (not generally recommended).
 
     CLI Examples:
 
     .. code-block:: bash
 
-        salt '*' pkg.file_list httpd
-        salt '*' pkg.file_list httpd postfix
-        salt '*' pkg.file_list
+        salt '*' pkg.file_dict httpd
+        salt '*' pkg.file_dict httpd postfix
+        salt '*' pkg.file_dict
     """
     errors = []
     ret = {}
@@ -555,12 +567,29 @@ def file_dict(*packages, **kwargs):
         for line in out["stdout"].splitlines():
             if line.endswith("contains:"):
                 continue
-            else:
-                files.append(line)
+            files.append(line)
         if files:
             ret[package] = files
 
     return {"errors": errors, "packages": ret}
+
+
+def _pkg_name_from_apk_string(pkg_string):
+    """
+    Extract the package name from a string in apk's name-version-revision
+    format (e.g. 'openssl-3.3.2-r0' -> 'openssl',
+    'py3-requests-2.28.0-r0' -> 'py3-requests').
+
+    Alpine package names never start a component with a digit, so the name
+    ends at the first dash-separated component that begins with a digit.
+    """
+    parts = pkg_string.split("-")
+    name_parts = []
+    for part in parts:
+        if part and part[0].isdigit():
+            break
+        name_parts.append(part)
+    return "-".join(name_parts) if name_parts else pkg_string
 
 
 def owner(*paths, **kwargs):
@@ -577,8 +606,8 @@ def owner(*paths, **kwargs):
 
     .. code-block:: bash
 
-        salt '*' pkg.owns /usr/bin/apachectl
-        salt '*' pkg.owns /usr/bin/apachectl /usr/bin/basename
+        salt '*' pkg.owner /usr/bin/apachectl
+        salt '*' pkg.owner /usr/bin/apachectl /usr/bin/basename
     """
     if not paths:
         return "You must provide a path"
@@ -588,14 +617,14 @@ def owner(*paths, **kwargs):
     for path in paths:
         cmd = cmd_search[:]
         cmd.append(path)
-        output = __salt__["cmd.run_stdout"](
-            cmd, output_loglevel="trace", python_shell=False
-        )
+        output = __salt__["cmd.run_stdout"](cmd, output_loglevel="trace", python_shell=False)
         if output:
             if "ERROR:" in output:
                 ret[path] = "Could not find owner package"
             else:
-                ret[path] = output.split("by ")[1].strip()
+                # apk outputs "<path> is owned by <name>-<version>-<revision>"
+                pkg_full = output.split("by ")[1].strip()
+                ret[path] = _pkg_name_from_apk_string(pkg_full)
         else:
             ret[path] = f"Error running {cmd}"
 
