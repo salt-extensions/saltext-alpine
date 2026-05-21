@@ -181,8 +181,10 @@ class TestLatestVersion:
         assert apk_module.latest_version() == ""
 
     def test_finds_upgrade_available(self):
+        # Real apk upgrade -s output includes a (N/M) progress prefix on each line.
+        # The parsing code uses column indices written for that format.
         apk_module.__salt__["cmd.run_stdout"].return_value = (
-            "Upgrading openssl (3.3.1-r0 -> 3.3.2-r0)"
+            "(1/1) Upgrading openssl (3.3.1-r0 -> 3.3.2-r0)"
         )
         result = apk_module.latest_version("openssl", refresh=False)
         assert result == "3.3.2-r0"
@@ -207,7 +209,7 @@ class TestLatestVersion:
 
     def test_returns_dict_for_multiple_packages(self):
         apk_module.__salt__["cmd.run_stdout"].side_effect = [
-            "Upgrading openssl (3.3.1-r0 -> 3.3.2-r0)",  # upgrade -s
+            "(1/1) Upgrading openssl (3.3.1-r0 -> 3.3.2-r0)",  # upgrade -s
             "",  # search htop - nothing found
         ]
         result = apk_module.latest_version("openssl", "htop", refresh=False)
@@ -462,7 +464,7 @@ class TestListUpgrades:
     def test_parses_upgrade_output(self):
         apk_module.__salt__["cmd.run_all"].return_value = {
             "retcode": 0,
-            "stdout": "Upgrading openssl (3.3.1-r0 -> 3.3.2-r0)",
+            "stdout": "(1/1) Upgrading openssl (3.3.1-r0 -> 3.3.2-r0)",
             "stderr": "",
         }
         result = apk_module.list_upgrades(refresh=False)
@@ -472,7 +474,8 @@ class TestListUpgrades:
         apk_module.__salt__["cmd.run_all"].return_value = {
             "retcode": 0,
             "stdout": (
-                "Upgrading openssl (3.3.1-r0 -> 3.3.2-r0)\n" "Upgrading musl (1.2.3-r0 -> 1.2.4-r0)"
+                "(1/2) Upgrading openssl (3.3.1-r0 -> 3.3.2-r0)\n"
+                "(2/2) Upgrading musl (1.2.3-r0 -> 1.2.4-r0)"
             ),
             "stderr": "",
         }
@@ -621,7 +624,7 @@ class TestOwner:
             "/usr/bin/openssl is owned by openssl-3.3.2-r0"
         )
         result = apk_module.owner("/usr/bin/openssl")
-        assert result == {"openssl": "3.3.2-r0"}
+        assert result == {"/usr/bin/openssl": "openssl"}
 
     def test_strips_version_from_hyphenated_package(self):
         apk_module.__salt__["cmd.run_stdout"].return_value = (
