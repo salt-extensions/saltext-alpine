@@ -30,14 +30,14 @@ except NameError:
 PROJECT_ROOT_DIR = Path(docs_basepath).parent
 
 addtl_paths = (
-    os.path.join(os.pardir, "src"),  # saltext.apkpkg itself (for autodoc)
+    os.path.join(os.pardir, "src"),  # saltext.alpine itself (for autodoc)
     "_ext",  # custom Sphinx extensions
 )
 
 for addtl_path in addtl_paths:
     sys.path.insert(0, os.path.abspath(os.path.join(docs_basepath, addtl_path)))
 
-dist = distribution("saltext.apkpkg")
+dist = distribution("saltext.alpine")
 
 
 # -- Project information -----------------------------------------------------

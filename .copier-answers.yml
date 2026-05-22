@@ -17,7 +17,7 @@ no_saltext_namespace: false
 os_support:
   - Linux
 package_name: alpine
-project_name: apkpkg
+project_name: alpine
 python_requires: '3.10'
 relax_pylint: true
 salt_version: '3007'

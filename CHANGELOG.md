@@ -3,3 +3,8 @@ The changelog format is based on [Keep a Changelog](https://keepachangelog.com/e
 This project uses [Semantic Versioning](https://semver.org/) - MAJOR.MINOR.PATCH
 
 # Changelog
+
+## 1.0.0 (2026-05-22)
+
+- Migrated apkpkg from legacy repo and merged into broader Alpine support saltext
+- Added openrc service support

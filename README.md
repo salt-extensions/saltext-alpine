@@ -14,7 +14,7 @@ For setup and usage instructions, please refer to the
 
 ## Contributing
 
-The saltext-apkpkg project welcomes contributions from anyone!
+The saltext-alpine project welcomes contributions from anyone!
 
 The [Salt Extensions guide][salt-extensions-guide] provides comprehensive instructions on all aspects
 of Salt extension development, including [writing tests][writing-tests], [running tests][running-tests],
@@ -29,7 +29,7 @@ To get started contributing, first clone this repository (or your fork):
 git clone --origin upstream git@github.com:salt-extensions/saltext-alpine.git
 
 # Change to the repo dir
-cd saltext-apkpkg
+cd saltext-alpine
 ```
 
 #### Automatic

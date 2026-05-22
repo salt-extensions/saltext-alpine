@@ -1,4 +1,4 @@
-.. all-saltext.apkpkg.modules:
+.. all-saltext.alpine.modules:
 
 _________________
 Execution Modules

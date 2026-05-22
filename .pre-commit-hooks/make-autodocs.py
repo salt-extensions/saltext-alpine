@@ -67,7 +67,7 @@ def write_index(index_rst, import_paths, kind):
         common_path = import_paths[0][: import_paths[0].rfind(".")]
     header = f"{'_'*len(header_text)}\n{header_text.title()}\n{'_'*len(header_text)}"
     index_contents = f"""\
-.. all-saltext.apkpkg.{kind}:
+.. all-saltext.alpine.{kind}:
 
 {header}
 
