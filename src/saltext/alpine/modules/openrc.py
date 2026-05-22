@@ -1,12 +1,33 @@
 """
-Support for OpenRC on Alpine Linux
+Service management for Alpine Linux via OpenRC.
+
+This module registers under Salt's ``service`` virtual name and is loaded
+automatically on Alpine minions. Existing states such as ``service.running``
+and ``service.dead`` work without any changes to your state files.
 
 .. important::
-    If you feel that Salt should be using this module to manage services on a
-    minion, and it is using a different module (or gives an error similar to
-    *'service.start' is not available*), see :ref:`here
+    If Salt is not using this module on an Alpine minion (or you see an error
+    such as *'service.start' is not available*), see :ref:`here
     <module-provider-override>`.
 
+Runlevels
+---------
+
+OpenRC organises services into named runlevels rather than systemd targets.
+The two runlevels relevant to most service management work are:
+
+``default``
+    Services that should start when the system reaches a normal running state.
+    This is the runlevel used by :py:func:`enable` and :py:func:`disable` when
+    no ``runlevel`` argument is supplied.
+
+``boot``
+    Services that must start earlier in the boot sequence, such as
+    ``networking``, ``syslog``, and ``hostname``. To manage a service in this
+    runlevel, pass ``runlevel=boot`` explicitly.
+
+Other runlevels (``sysinit``, ``shutdown``, ``nonetwork``) exist but are
+rarely targeted directly by Salt states.
 """
 
 import logging

@@ -1,14 +1,35 @@
 """
-Support for apk
+Package management for Alpine Linux via ``apk``.
+
+This module registers under Salt's ``pkg`` virtual name and is loaded
+automatically on Alpine minions. Existing states such as ``pkg.installed``
+and ``pkg.removed`` work without any changes to your state files.
 
 .. important::
-    If you feel that Salt should be using this module to manage packages on a
-    minion, and it is using a different module (or gives an error similar to
-    *'pkg.install' is not available*), see :ref:`here
+    If Salt is not using this module on an Alpine minion (or you see an error
+    such as *'pkg.install' is not available*), see :ref:`here
     <module-provider-override>`.
 
-.. versionadded:: 2017.7.0
+Version strings
+---------------
 
+Alpine packages follow the ``version-revision`` convention, for example
+``3.3.2-r0``. This is what :py:func:`list_pkgs`, :py:func:`version`, and
+related functions return.
+
+Hyphenated package names such as ``py3-requests`` and ``ca-certificates``
+are handled correctly throughout. The module identifies the boundary between
+name and version by locating the first dash-separated component that begins
+with a digit.
+
+Known limitations
+-----------------
+
+- Installing a specific package version is not yet supported. The version
+  component of any ``pkgs`` dict entry is accepted but silently ignored.
+- Package hold and pin operations are not yet implemented.
+- Repository management (adding, removing, or listing ``/etc/apk/repositories``
+  entries) is not yet implemented.
 """
 
 import copy
