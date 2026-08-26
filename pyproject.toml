@@ -87,9 +87,8 @@ tests = [
     "pytest-instafail",
 ]
 
-[project.entry-points."salt.modules"]
-apk    = "saltext.alpine.modules.apk"
-openrc = "saltext.alpine.modules.openrc"
+[pyproject.entry-points."salt.loader"]
+"saltext.alpine" = "saltext.alpine"
 
 [tool.uv]
 # Salt's legacy setup.py requires old setuptools.
