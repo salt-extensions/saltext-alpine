@@ -87,7 +87,7 @@ tests = [
     "pytest-instafail",
 ]
 
-[pyproject.entry-points."salt.loader"]
+[project.entry-points."salt.loader"]
 "saltext.alpine" = "saltext.alpine"
 
 [tool.uv]
