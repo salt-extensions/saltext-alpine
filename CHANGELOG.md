@@ -4,6 +4,11 @@ This project uses [Semantic Versioning](https://semver.org/) - MAJOR.MINOR.PATCH
 
 # Changelog
 
+## 1.0.1 (2026-08-26)
+
+- Fix saltext entrypoint
+
+
 ## 1.0.0 (2026-05-22)
 
 - Migrated apkpkg from legacy repo and merged into broader Alpine support saltext
