@@ -10,4 +10,3 @@ _________________
     :toctree:
 
     apk
-    openrc

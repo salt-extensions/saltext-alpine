@@ -1,15 +1,10 @@
 ``saltext-alpine``: Salt Extension for Alpine Linux
 ====================================================
 
-This extension adds first-class Alpine Linux support to Salt by providing
-execution modules for the two subsystems Salt core does not cover on Alpine:
+This extension adds first-class Alpine Linux support to Salt:
 
 - **pkg** (``saltext.alpine.modules.apk``) -- package management via ``apk``
-- **service** (``saltext.alpine.modules.openrc``) -- service management via OpenRC
-
-Both modules register under Salt's standard virtual names, so existing states
-such as ``pkg.installed`` and ``service.running`` work on Alpine minions
-without any changes to your state files.
+- **service** (``saltext.openrc``) -- service management via ``openrc``
 
 .. toctree::
   :maxdepth: 2
