@@ -38,6 +38,7 @@ requires-python = ">= 3.10"
 dynamic = ["version"]
 dependencies = [
     "salt>=3007",
+    "saltext-openrc>=0.1.0",
 ]
 
 [project.readme]
