@@ -6,7 +6,7 @@ This project uses [Semantic Versioning](https://semver.org/) - MAJOR.MINOR.PATCH
 
 ## 1.0.3 (2026-10-05)
 
-No significant changes.
+Remove openrc module, and now depend on saltext-openrc
 
 
 ## 1.0.2 (2026-08-26)
