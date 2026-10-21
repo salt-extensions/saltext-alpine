@@ -1,0 +1,1 @@
+Add an Alpine-specific ``system`` module that reimplements ``reboot``, ``shutdown``, ``poweroff``, and ``halt`` on top of BusyBox. This fixes ``FileNotFoundError: 'shutdown'`` when calling ``system.reboot`` and friends on Alpine, where no ``shutdown`` binary is present.
