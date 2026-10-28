@@ -1,8 +1,8 @@
 # Installation
 
-The extension must be installed into the same Python environment Salt uses on
-each minion you want Alpine support on. Saltexts are not distributed
-automatically via the fileserver like custom modules.
+The extension must be installed into the same Python environment Salt
+uses on each minion you want Alpine support on. Saltexts are not
+distributed automatically via the fileserver like custom modules.
 
 :::{tab} State
 ```yaml
@@ -22,25 +22,33 @@ salt-pip install saltext-alpine
 ```bash
 pip install saltext-alpine
 ```
+
+Salt itself is expected to be provided by the environment. If it
+should be pip-managed as well, request the `salt` extra:
+
+```bash
+pip install 'saltext-alpine[salt]'
+```
 :::
 
 :::{hint}
-On Alpine, Salt is typically installed from the community repository. The
-Python environment Salt uses is the system Python, so a regular ``pip install``
-is correct for most setups. If you have installed Salt into a virtual
-environment, activate it first.
+On Alpine, Salt is typically installed from the community repository.
+The Python environment Salt uses is the system Python, so a regular
+`pip install` is correct for most setups. If you have installed Salt
+into a virtual environment, activate it first.
 :::
 
 ## Verifying the installation
 
-After installing, confirm that Salt has loaded the modules on your Alpine
-minion:
+After installing, confirm that Salt has loaded the modules on your
+Alpine minion:
 
 ```bash
 salt <minion-id> sys.doc pkg.install
 salt <minion-id> sys.doc service.start
 ```
 
-Both commands should return documentation pulled from this extension. If they
-return nothing or show a different provider, see
-:ref:`module-provider-override` in the Salt documentation.
+Both commands should return documentation pulled from this extension.
+If they return nothing or show a different provider, see
+
+:ref: `module-provider-override` in the Salt documentation.
