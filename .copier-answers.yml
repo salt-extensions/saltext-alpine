@@ -2,6 +2,9 @@
 ---
 _commit: 0.11.0
 _src_path: https://github.com/salt-extensions/salt-extension-copier
+alpine_releases:
+  - '3.24'
+  - '3.23'
 author: Will Sinatra
 author_email: durrendal@lambdacreate.com
 coc_contact: ''
@@ -11,7 +14,7 @@ docs_url: https://salt-extensions.github.io/saltext-alpine/
 integration_name: Alpine
 license: apache
 linux_test_distros:
-  - Ubuntu
+  - Alpine
 loaders:
   - module
 max_salt_version: '3008'
@@ -30,7 +33,5 @@ summary: Salt Extension for interacting with Alpine Linux
 test_containers: true
 tracker_url: https://github.com/salt-extensions/saltext-alpine/issues
 typing: false
-ubuntu_releases:
-  - '26.04'
 url: https://github.com/salt-extensions/saltext-alpine
 venv_python: '3.14'

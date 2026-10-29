@@ -13,25 +13,27 @@ permissions: {}
 
 jobs:
 
-  Linux:
-    name: Linux Tests
+  Alpine:
+    name: Alpine Tests
     runs-on: ubuntu-26.04
-    timeout-minutes: 30
+    timeout-minutes: 45
     permissions:
       contents: read
       id-token: write  # codecov upload
 
     env:
-      SALT_REQUIREMENT: salt==${{ matrix.salt-version }}
-      VENV_PYTHON: ${{ matrix.python-version }}
+      # Salt and its dependencies are provided as system packages, which
+      # the session venvs inherit. This makes the tests run against the
+      # OS-packaged Salt release and avoids expensive source builds of
+      # binary dependencies.
+      VENV_SYSTEM_SITE_PACKAGES: '1'
 
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
-        include:
-          - {salt-version: "3007.16", python-version: "3.11"}
-          - {salt-version: "3008.4", python-version: "3.14"}
+        osrelease:
+          - "3.24"
+          - "3.23"
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -40,62 +42,49 @@ jobs:
           fetch-depth: 2  # coverage: Issue detecting commit SHA
           persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0  # v7.1.0
+      - name: Start VM
+        uses: vmactions/alpine-vm@bbc5d76bdbe2d3497bdd8c6c7f09c94aa01c785e  # v1.0.2
         with:
-          python-version: ${{ matrix.python-version }}
+          release: "${{ matrix.osrelease }}"
+          envs: 'SKIP_REQUIREMENTS_INSTALL VENV_SYSTEM_SITE_PACKAGES'
+          custom-shell-name: alpine
+          # Cache the prepared VM image, keyed on the `prepare` script's hash
+          cache-after-prepare: true
+          prepare: |-
+            apk add git salt py3-pip
+            env PIP_BREAK_SYSTEM_PACKAGES=1 python3 -m pip install "nox==2026.10.20"
+            # Without the OS-packaged Salt, tests would pull in Salt from
+            # PyPI, which fails in confusing ways (if at all).
+            python3 -c 'import salt'
 
-      - name: Install Nox
+      - name: System Salt Versions Report
+        shell: alpine {0}
         run: |
-          pip install "nox==${NOX_VERSION}" "uv==${UV_VERSION}"
-        env:
-          NOX_VERSION: '2026.10.20'
-          UV_VERSION: '0.13.5'
-
-      - name: Configure uv Cache Location
-        # `runner.temp` is not available in job-level `env` definitions
-        shell: bash
-        run: echo "UV_CACHE_DIR=${RUNNER_TEMP}/uv-cache" >> "$GITHUB_ENV"
-
-      - name: Cache uv Wheels
-        # Release builds must not use cached environments
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
-        with:
-          path: ${{ env.UV_CACHE_DIR }}
-          key: uv-${{ runner.os }}-py${{ matrix.python-version }}-salt${{ matrix.salt-version }}-${{ hashFiles('pyproject.toml', 'noxfile.py') }}
-          restore-keys: |-
-            uv-${{ runner.os }}-py${{ matrix.python-version }}-salt${{ matrix.salt-version }}-
+          python3 -c 'from salt.version import versions_report; print("\n".join(versions_report()))'
 
       - name: Install Test Requirements
+        shell: alpine {0}
         run: |
-          nox --force-color -e test --install-only
-
-      - name: Prune uv Cache
-        # Release builds must not use cached environments
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        run: uv cache prune --ci
+          nox --force-color --force-python=3 -e tests --install-only
 
       - name: Test
+        shell: alpine {0}
         env:
           SKIP_REQUIREMENTS_INSTALL: '1'
         run: |
-          nox --force-color -e test -- -vv --instafail tests/
+          nox --force-color --force-python=3 -e tests -- -vv --instafail tests/
 
       - name: Create Codecov Flags
         id: codecov-flags
         if: ${{ !cancelled() }}
         shell: bash
-        env:
-          SALT_VERSION: ${{ matrix.salt-version }}
         run: |
-          salt_version="${SALT_VERSION%%.*}"
           # ${GITHUB_JOB,,} requires bash 4+, but macOS runners ship bash 3.2
           os="$(tr '[:upper:]' '[:lower:]' <<< "$GITHUB_JOB")"
           os="${os//-/_}"
 
-          echo "project=project,project_${os},project_salt_${salt_version}" >> "$GITHUB_OUTPUT"
-          echo "tests=tests,tests_${os},tests_salt_${salt_version}" >> "$GITHUB_OUTPUT"
+          echo "project=project,project_${os}" >> "$GITHUB_OUTPUT"
+          echo "tests=tests,tests_${os}" >> "$GITHUB_OUTPUT"
 
       - name: Upload Project Code Coverage
         if: ${{ !cancelled() }}
@@ -106,7 +95,7 @@ jobs:
           fail_ci_if_error: false
           handle_no_reports_found: true
           flags: ${{ steps.codecov-flags.outputs.project }}
-          name: ${{ github.job }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}-project
+          name: ${{ github.job }}-${{ matrix.osrelease }}-project
           use_oidc: true
           version: v11.3.1
 
@@ -119,7 +108,7 @@ jobs:
           fail_ci_if_error: false
           handle_no_reports_found: true
           flags: ${{ steps.codecov-flags.outputs.tests }}
-          name: ${{ github.job }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}-tests
+          name: ${{ github.job }}-${{ matrix.osrelease }}-tests
           use_oidc: true
           version: v11.3.1
 
@@ -127,11 +116,11 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
-          name: runtests-${{ github.job }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}.log
+          name: runtests-${{ github.job }}-${{ matrix.osrelease }}.log
           path: artifacts/runtests-*.log
 
       - name: Upload Exit Status
         if: ${{ !cancelled() }}
         uses: $/.github/actions/upload-exitstatus
         with:
-          name: ${{ github.job }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}
+          name: ${{ github.job }}-${{ matrix.osrelease }}
