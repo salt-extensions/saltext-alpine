@@ -3,89 +3,124 @@ name: Testing
 
 on:
   workflow_call:
+    inputs:
+      checkout-ref:
+        required: false
+        type: string
+        default: ''
+
+permissions: {}
 
 jobs:
 
-  Linux:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 30
+  Alpine:
+    name: Alpine Tests
+    runs-on: ubuntu-26.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write  # codecov upload
+
+    env:
+      # Salt and its dependencies are provided as system packages, which
+      # the session venvs inherit. This makes the tests run against the
+      # OS-packaged Salt release and avoids expensive source builds of
+      # binary dependencies.
+      VENV_SYSTEM_SITE_PACKAGES: '1'
 
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
-        include:
-          - {salt-version: "3007.14", python-version: "3.10"}
-          - {salt-version: "3008.2", python-version: "3.14"}
+        osrelease:
+          - "3.24"
+          - "3.23"
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
+          ref: ${{ inputs.checkout-ref || github.sha }}
           fetch-depth: 2  # coverage: Issue detecting commit SHA
+          persist-credentials: false
 
-      - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1  # v6.3.0
+      - name: Start VM
+        uses: vmactions/alpine-vm@bbc5d76bdbe2d3497bdd8c6c7f09c94aa01c785e  # v1.0.2
         with:
-          python-version: ${{ matrix.python-version }}
+          release: "${{ matrix.osrelease }}"
+          envs: 'SKIP_REQUIREMENTS_INSTALL VENV_SYSTEM_SITE_PACKAGES'
+          custom-shell-name: alpine
+          # Cache the prepared VM image, keyed on the `prepare` script's hash
+          cache-after-prepare: true
+          prepare: |-
+            apk add git salt py3-pip
+            env PIP_BREAK_SYSTEM_PACKAGES=1 python3 -m pip install "nox==2026.10.20"
+            # Without the OS-packaged Salt, tests would pull in Salt from
+            # PyPI, which fails in confusing ways (if at all).
+            python3 -c 'import salt'
 
-      - name: Install Nox
+      - name: System Salt Versions Report
+        shell: alpine {0}
         run: |
-          python -m pip install --upgrade pip
-          pip install "nox==$NOX_VERSION" "uv==$UV_VERSION"
-        env:
-          NOX_VERSION: '2026.4.10'
-          UV_VERSION: '0.11.26'
+          python3 -c 'from salt.version import versions_report; print("\n".join(versions_report()))'
 
       - name: Install Test Requirements
-        env:
-          SALT_REQUIREMENT: salt==${{ matrix.salt-version }}
+        shell: alpine {0}
         run: |
-          nox --force-color -e tests-3 --install-only
+          nox --force-color --force-python=3 -e tests --install-only
 
       - name: Test
+        shell: alpine {0}
         env:
-          SALT_REQUIREMENT: salt==${{ matrix.salt-version }}
-          SKIP_REQUIREMENTS_INSTALL: true
+          SKIP_REQUIREMENTS_INSTALL: '1'
         run: |
-          nox --force-color -e tests-3 -- -vv --instafail tests/
+          nox --force-color --force-python=3 -e tests -- -vv --instafail tests/
 
-      - name: Create CodeCov Flags
-        if: always()
+      - name: Create Codecov Flags
         id: codecov-flags
+        if: ${{ !cancelled() }}
+        shell: bash
         run: |
-          echo "flags=$(python -c "import sys; print('{},{},salt_{}'.format('${{ runner.os }}'.replace('-latest', ''), 'py{}{}'.format(*sys.version_info), '_'.join(str(v) for v in '${{ matrix.salt-version }}'.replace('==', '_').split('.'))))")" >> "$GITHUB_OUTPUT"
+          # ${GITHUB_JOB,,} requires bash 4+, but macOS runners ship bash 3.2
+          os="$(tr '[:upper:]' '[:lower:]' <<< "$GITHUB_JOB")"
+          os="${os//-/_}"
+
+          echo "project=project,project_${os}" >> "$GITHUB_OUTPUT"
+          echo "tests=tests,tests_${os}" >> "$GITHUB_OUTPUT"
 
       - name: Upload Project Code Coverage
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v7.1.1
         with:
           files: artifacts/coverage-project.xml
           disable_search: true
           fail_ci_if_error: false
-          flags: ${{ steps.codecov-flags.outputs.flags }},project
-          name: ${{ runner.os }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}-project
+          handle_no_reports_found: true
+          flags: ${{ steps.codecov-flags.outputs.project }}
+          name: ${{ github.job }}-${{ matrix.osrelease }}-project
           use_oidc: true
-          version: v11.2.8
+          version: v11.3.1
 
       - name: Upload Tests Code Coverage
-        uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f  # v7.0.0
+        if: ${{ !cancelled() }}
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5  # v7.1.1
         with:
           files: artifacts/coverage-tests.xml
           disable_search: true
           fail_ci_if_error: false
-          flags: ${{ steps.codecov-flags.outputs.flags }},tests
-          name: ${{ runner.os }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}-tests
+          handle_no_reports_found: true
+          flags: ${{ steps.codecov-flags.outputs.tests }}
+          name: ${{ github.job }}-${{ matrix.osrelease }}-tests
           use_oidc: true
-          version: v11.2.8
+          version: v11.3.1
 
       - name: Upload Logs
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         with:
-          name: runtests-${{ runner.os }}-py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}.log
+          name: runtests-${{ github.job }}-${{ matrix.osrelease }}.log
           path: artifacts/runtests-*.log
 
       - name: Upload Exit Status
-        if: always()
-        uses: ./.github/actions/upload-exitstatus
+        if: ${{ !cancelled() }}
+        uses: $/.github/actions/upload-exitstatus
         with:
-          name: ${{ github.job }}-Py${{ matrix.python-version }}-Salt${{ matrix.salt-version }}
+          name: ${{ github.job }}-${{ matrix.osrelease }}
